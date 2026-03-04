@@ -56,9 +56,16 @@ function getRemainingMs(): number {
 
 let trayUpdateInterval: ReturnType<typeof setInterval> | null = null;
 
+function persistTimerState() {
+  const remaining = getRemainingMs();
+  db.setSetting("timerRemainingMs", String(remaining));
+  db.setSetting("timerSavedAt", String(Date.now()));
+}
+
 function updateTrayTitle() {
   const remaining = getRemainingMs();
   tray.setTitle(formatTimer(remaining));
+  persistTimerState();
 }
 
 function startTrayUpdates() {
@@ -151,6 +158,13 @@ function createWindow() {
           startPopupTimer();
           return { success: true };
         },
+
+        extendTimer: ({ minutes }: { minutes: number }) => {
+          extendPopupTimer(minutes);
+          return { success: true };
+        },
+
+        getTimerRemaining: () => getRemainingMs(),
       }) as any,
       messages: {},
     },
@@ -191,6 +205,22 @@ function startPopupTimer() {
     popupRemainingMs = popupIntervalMinutes * 60_000;
     popupStartedAt = Date.now();
     popupTimer = setTimeout(arguments.callee as any, popupRemainingMs);
+  }, popupRemainingMs);
+}
+
+function extendPopupTimer(minutes: number) {
+  if (popupTimer) clearTimeout(popupTimer);
+  popupRemainingMs = minutes * 60_000;
+  popupStartedAt = Date.now();
+
+  popupTimer = setTimeout(() => {
+    if (!win) createWindow();
+    if (win) {
+      win.setAlwaysOnTop(true);
+      win.focus();
+    }
+    if (currentRpc) (currentRpc as any).send.popupTriggered({});
+    startPopupTimer();
   }, popupRemainingMs);
 }
 
@@ -284,6 +314,34 @@ tray.on("tray-clicked", (event: any) => {
 
 // --- Start ---
 createWindow();
-startPopupTimer();
+
+// Restore timer from persisted state if available
+const savedRemainingMs = Number(db.getSetting("timerRemainingMs", "0"));
+const savedAt = Number(db.getSetting("timerSavedAt", "0"));
+
+if (savedAt > 0 && savedRemainingMs > 0) {
+  const elapsed = Date.now() - savedAt;
+  const remaining = savedRemainingMs - elapsed;
+  if (remaining > 0) {
+    // Resume from where we left off
+    popupRemainingMs = remaining;
+    popupStartedAt = Date.now();
+    popupTimer = setTimeout(() => {
+      if (!win) createWindow();
+      if (win) {
+        win.setAlwaysOnTop(true);
+        win.focus();
+      }
+      if (currentRpc) (currentRpc as any).send.popupTriggered({});
+      startPopupTimer();
+    }, popupRemainingMs);
+  } else {
+    // Timer would have fired while app was closed — start fresh
+    startPopupTimer();
+  }
+} else {
+  startPopupTimer();
+}
+
 startIdlePolling();
 startTrayUpdates();

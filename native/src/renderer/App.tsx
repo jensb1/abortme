@@ -33,6 +33,8 @@ export function App() {
   const [showSettings, setShowSettings] = useState(false);
   const [showStats, setShowStats] = useState(false);
   const [idle, setIdle] = useState(false);
+  const [timerMinutes, setTimerMinutes] = useState<number | null>(null);
+  const [timerKey, setTimerKey] = useState(0);
 
   // Activities
   const [workActivities, setWorkActivities] = useState<Activity[]>(defaultWorkActivities);
@@ -138,6 +140,16 @@ export function App() {
       .catch(() => {});
     rpc.request.dismissPopup({}).catch(() => {});
     setSelectedWork(new Set());
+    setTimerMinutes(null);
+    setTimerKey((k) => k + 1);
+    setStep("working");
+  }
+
+  function handleSnooze() {
+    rpc.request.dismissPopup({}).catch(() => {});
+    rpc.request.extendTimer({ minutes: 5 }).catch(() => {});
+    setTimerMinutes(5);
+    setTimerKey((k) => k + 1);
     setStep("working");
   }
 
@@ -155,6 +167,8 @@ export function App() {
     rpc.request.dismissPopup({}).catch(() => {});
     setSelectedWork(new Set());
     setSelectedBreak(new Set());
+    setTimerMinutes(null);
+    setTimerKey((k) => k + 1);
     setStep("working");
   }
 
@@ -263,7 +277,7 @@ export function App() {
 
       <div className="w-full max-w-md rounded-xl border border-border bg-card p-6 shadow-2xl">
         {step === "working" && (
-          <WorkingStep popupIntervalMinutes={popupInterval} paused={idle} />
+          <WorkingStep key={timerKey} popupIntervalMinutes={timerMinutes ?? popupInterval} paused={idle} />
         )}
 
         {step === "work" && (
@@ -275,6 +289,7 @@ export function App() {
             onRemove={removeWorkActivity}
             onNext={handleWorkNext}
             onExtend={handleWorkExtend}
+            onSnooze={handleSnooze}
           />
         )}
 

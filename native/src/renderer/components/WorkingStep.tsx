@@ -12,6 +12,13 @@ export function WorkingStep({ popupIntervalMinutes, paused }: WorkingStepProps) 
   const [secondsLeft, setSecondsLeft] = useState(popupIntervalMinutes * 60);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  // Sync with actual remaining time from main process
+  useEffect(() => {
+    rpc.request.getTimerRemaining({}).then((ms) => {
+      if (ms > 0) setSecondsLeft(Math.ceil(ms / 1000));
+    }).catch(() => {});
+  }, []);
+
   useEffect(() => {
     if (paused) {
       if (intervalRef.current) clearInterval(intervalRef.current);

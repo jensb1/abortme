@@ -10,6 +10,7 @@ interface WorkStepProps {
   onRemove: (id: string) => void;
   onNext: () => void;
   onExtend: () => void;
+  onSnooze: () => void;
 }
 
 export function WorkStep({
@@ -20,6 +21,7 @@ export function WorkStep({
   onRemove,
   onNext,
   onExtend,
+  onSnooze,
 }: WorkStepProps) {
   return (
     <div className="flex flex-col gap-6">
@@ -58,6 +60,14 @@ export function WorkStep({
           className="w-full"
         >
           Log &amp; keep working
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={onSnooze}
+          className="w-full text-muted-foreground"
+        >
+          +5 min
         </Button>
       </div>
     </div>

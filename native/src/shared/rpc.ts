@@ -68,6 +68,14 @@ export type AppRPC = ElectrobunRPCSchema & {
         params: {};
         response: { success: boolean };
       };
+      extendTimer: {
+        params: { minutes: number };
+        response: { success: boolean };
+      };
+      getTimerRemaining: {
+        params: {};
+        response: number;
+      };
     };
     messages: {
       popupTriggered: {};
