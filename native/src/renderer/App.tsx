@@ -160,6 +160,7 @@ export function App() {
         durationMinutes: breakDuration,
       })
       .catch(() => {});
+    rpc.request.startBreakTimer({ minutes: breakDuration }).catch(() => {});
     setStep("timer");
   }
 

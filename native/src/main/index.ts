@@ -11,9 +11,13 @@ const appUrl = viewsExist
   ? "views://renderer/index.html"
   : "http://localhost:6001";
 
-const trayIconPath = viewsExist
+const trayIconWork = viewsExist
   ? resolve("../Resources/app/assets/tray-iconTemplate.png")
   : resolve("assets/tray-iconTemplate.png");
+
+const trayIconBreak = viewsExist
+  ? resolve("../Resources/app/assets/tray-icon-breakTemplate.png")
+  : resolve("assets/tray-icon-breakTemplate.png");
 
 let popupIntervalMinutes = Number(db.getSetting("popupInterval", "20"));
 let breakDurationMinutes = Number(db.getSetting("breakDuration", "5"));
@@ -27,6 +31,11 @@ let popupRemainingMs = 0;
 let popupStartedAt = 0;
 let isIdle = false;
 let idlePoller: ReturnType<typeof setInterval> | null = null;
+
+// --- Break timer state ---
+let isOnBreak = false;
+let breakRemainingMs = 0;
+let breakStartedAt = 0;
 
 async function getIdleSeconds(): Promise<number> {
   try {
@@ -56,16 +65,37 @@ function getRemainingMs(): number {
 
 let trayUpdateInterval: ReturnType<typeof setInterval> | null = null;
 
+function getBreakRemainingMs(): number {
+  if (!isOnBreak) return 0;
+  const elapsed = Date.now() - breakStartedAt;
+  return Math.max(0, breakRemainingMs - elapsed);
+}
+
 function persistTimerState() {
   const remaining = getRemainingMs();
   db.setSetting("timerRemainingMs", String(remaining));
   db.setSetting("timerSavedAt", String(Date.now()));
 }
 
+let currentTrayMode: "work" | "break" = "work";
+
 function updateTrayTitle() {
-  const remaining = getRemainingMs();
-  tray.setTitle(formatTimer(remaining));
-  persistTimerState();
+  if (isOnBreak) {
+    const remaining = getBreakRemainingMs();
+    tray.setTitle(formatTimer(remaining));
+    if (currentTrayMode !== "break") {
+      tray.setImage(trayIconBreak);
+      currentTrayMode = "break";
+    }
+  } else {
+    const remaining = getRemainingMs();
+    tray.setTitle(formatTimer(remaining));
+    persistTimerState();
+    if (currentTrayMode !== "work") {
+      tray.setImage(trayIconWork);
+      currentTrayMode = "work";
+    }
+  }
 }
 
 function startTrayUpdates() {
@@ -151,6 +181,9 @@ function createWindow() {
 
         dismissPopup: () => {
           if (win) win.setAlwaysOnTop(false);
+          isOnBreak = false;
+          breakRemainingMs = 0;
+          startPopupTimer();
           return { success: true };
         },
 
@@ -165,6 +198,13 @@ function createWindow() {
         },
 
         getTimerRemaining: () => getRemainingMs(),
+
+        startBreakTimer: ({ minutes }: { minutes: number }) => {
+          isOnBreak = true;
+          breakRemainingMs = minutes * 60_000;
+          breakStartedAt = Date.now();
+          return { success: true };
+        },
       }) as any,
       messages: {},
     },
@@ -201,10 +241,9 @@ function startPopupTimer() {
       win.focus();
     }
     if (currentRpc) (currentRpc as any).send.popupTriggered({});
-    // Reset for next cycle
-    popupRemainingMs = popupIntervalMinutes * 60_000;
-    popupStartedAt = Date.now();
-    popupTimer = setTimeout(arguments.callee as any, popupRemainingMs);
+    // Don't auto-restart — wait for dismissPopup after break flow completes
+    popupTimer = null;
+    popupRemainingMs = 0;
   }, popupRemainingMs);
 }
 
@@ -220,7 +259,8 @@ function extendPopupTimer(minutes: number) {
       win.focus();
     }
     if (currentRpc) (currentRpc as any).send.popupTriggered({});
-    startPopupTimer();
+    popupTimer = null;
+    popupRemainingMs = 0;
   }, popupRemainingMs);
 }
 
@@ -244,7 +284,8 @@ function resumePopupTimer() {
       win.focus();
     }
     if (currentRpc) (currentRpc as any).send.popupTriggered({});
-    startPopupTimer();
+    popupTimer = null;
+    popupRemainingMs = 0;
   }, popupRemainingMs);
 }
 
@@ -277,7 +318,7 @@ Electrobun.events.on("close", (event: { data: { id: number } }) => {
 // --- Tray setup ---
 const tray = new Tray({
   title: "00:00",
-  image: trayIconPath,
+  image: trayIconWork,
   template: true,
   width: 18,
   height: 18,
@@ -333,7 +374,8 @@ if (savedAt > 0 && savedRemainingMs > 0) {
         win.focus();
       }
       if (currentRpc) (currentRpc as any).send.popupTriggered({});
-      startPopupTimer();
+      popupTimer = null;
+      popupRemainingMs = 0;
     }, popupRemainingMs);
   } else {
     // Timer would have fired while app was closed — start fresh

@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AbortMe — Break Reminder for macOS</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0a0a0b;
+      --card: #141417;
+      --border: #27272a;
+      --text: #fafafa;
+      --muted: #a1a1aa;
+      --purple: #8b5cf6;
+      --purple-glow: rgba(139, 92, 246, 0.15);
+      --green: #22c55e;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      min-height: 100vh;
+    }
+
+    .container {
+      max-width: 720px;
+      margin: 0 auto;
+      padding: 4rem 1.5rem;
+    }
+
+    .hero {
+      text-align: center;
+      margin-bottom: 4rem;
+    }
+
+    .logo {
+      width: 96px;
+      height: 96px;
+      margin-bottom: 1.5rem;
+      border-radius: 22px;
+      box-shadow: 0 0 60px var(--purple-glow);
+    }
+
+    h1 {
+      font-size: 2.5rem;
+      font-weight: 700;
+      letter-spacing: -0.03em;
+      margin-bottom: 0.5rem;
+    }
+
+    .tagline {
+      font-size: 1.15rem;
+      color: var(--muted);
+      margin-bottom: 2rem;
+    }
+
+    .download-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      background: var(--purple);
+      color: white;
+      text-decoration: none;
+      padding: 0.85rem 2rem;
+      border-radius: 10px;
+      font-size: 1rem;
+      font-weight: 600;
+      transition: transform 0.15s, box-shadow 0.15s;
+      box-shadow: 0 0 30px var(--purple-glow);
+    }
+
+    .download-btn:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 0 50px var(--purple-glow);
+    }
+
+    .download-meta {
+      margin-top: 0.75rem;
+      font-size: 0.8rem;
+      color: var(--muted);
+    }
+
+    .features {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+      margin-bottom: 4rem;
+    }
+
+    @media (max-width: 540px) {
+      .features { grid-template-columns: 1fr; }
+      h1 { font-size: 2rem; }
+    }
+
+    .feature {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.25rem;
+    }
+
+    .feature-icon {
+      font-size: 1.5rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .feature h3 {
+      font-size: 0.95rem;
+      font-weight: 600;
+      margin-bottom: 0.25rem;
+    }
+
+    .feature p {
+      font-size: 0.85rem;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+
+    .screenshot-section {
+      text-align: center;
+      margin-bottom: 4rem;
+    }
+
+    .screenshot-section h2 {
+      font-size: 1.5rem;
+      font-weight: 600;
+      margin-bottom: 1.5rem;
+    }
+
+    .mockup {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 2rem;
+      max-width: 380px;
+      margin: 0 auto;
+      box-shadow: 0 25px 50px rgba(0,0,0,0.4);
+    }
+
+    .mockup-timer {
+      font-family: "SF Mono", "Fira Code", monospace;
+      font-size: 4rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      color: var(--text);
+      text-align: center;
+      margin: 1rem 0;
+    }
+
+    .mockup-label {
+      color: var(--muted);
+      font-size: 0.9rem;
+      text-align: center;
+    }
+
+    .mockup-bar {
+      margin-top: 1.5rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.8rem;
+      color: var(--muted);
+    }
+
+    .mockup-bar-fill {
+      flex: 1;
+      height: 6px;
+      background: var(--border);
+      border-radius: 3px;
+      overflow: hidden;
+    }
+
+    .mockup-bar-fill::after {
+      content: "";
+      display: block;
+      width: 65%;
+      height: 100%;
+      background: var(--purple);
+      border-radius: 3px;
+    }
+
+    .how-it-works {
+      margin-bottom: 4rem;
+    }
+
+    .how-it-works h2 {
+      font-size: 1.5rem;
+      font-weight: 600;
+      margin-bottom: 1.5rem;
+      text-align: center;
+    }
+
+    .steps {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    .step {
+      display: flex;
+      gap: 1rem;
+      align-items: flex-start;
+    }
+
+    .step-num {
+      flex-shrink: 0;
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: var(--purple);
+      color: white;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.8rem;
+      font-weight: 700;
+      margin-top: 2px;
+    }
+
+    .step-text {
+      font-size: 0.95rem;
+      color: var(--muted);
+    }
+
+    .step-text strong {
+      color: var(--text);
+    }
+
+    .tech {
+      text-align: center;
+      padding: 2rem 0;
+      border-top: 1px solid var(--border);
+      color: var(--muted);
+      font-size: 0.85rem;
+    }
+
+    .tech a {
+      color: var(--purple);
+      text-decoration: none;
+    }
+
+    .tech a:hover { text-decoration: underline; }
+
+    .badge {
+      display: inline-block;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 0.15rem 0.5rem;
+      font-size: 0.75rem;
+      color: var(--muted);
+      margin: 0 0.15rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="hero">
+      <img src="logo.svg" alt="AbortMe" class="logo">
+      <h1>AbortMe</h1>
+      <p class="tagline">A macOS break reminder that lives in your menu bar.<br>Track what you work on. Take better breaks.</p>
+      <a href="AbortMe.dmg" class="download-btn">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Download for macOS
+      </a>
+      <p class="download-meta">macOS 13+ &middot; Apple Silicon &middot; Free &amp; open source</p>
+    </div>
+
+    <div class="features">
+      <div class="feature">
+        <div class="feature-icon">&#9201;</div>
+        <h3>Work Timer</h3>
+        <p>Configurable countdown (1-60 min) that pops up when it's time for a break.</p>
+      </div>
+      <div class="feature">
+        <div class="feature-icon">&#9776;</div>
+        <h3>Menu Bar</h3>
+        <p>Timer countdown always visible in the macOS menu bar. Close the window, keep working.</p>
+      </div>
+      <div class="feature">
+        <div class="feature-icon">&#128203;</div>
+        <h3>Activity Tracking</h3>
+        <p>Log what you're working on and what you do during breaks. All stored locally.</p>
+      </div>
+      <div class="feature">
+        <div class="feature-icon">&#128202;</div>
+        <h3>Stats Dashboard</h3>
+        <p>Day, week, and month views with charts showing your work and break patterns.</p>
+      </div>
+      <div class="feature">
+        <div class="feature-icon">&#128164;</div>
+        <h3>Idle Detection</h3>
+        <p>Automatically pauses the timer when you step away. Resumes when you're back.</p>
+      </div>
+      <div class="feature">
+        <div class="feature-icon">&#128264;</div>
+        <h3>Audio Alerts</h3>
+        <p>Beep sounds when the popup fires and when your break timer ends.</p>
+      </div>
+      <div class="feature">
+        <div class="feature-icon">&#9203;</div>
+        <h3>Snooze</h3>
+        <p>Not ready for a break? Quick +5 min snooze or log and keep working.</p>
+      </div>
+      <div class="feature">
+        <div class="feature-icon">&#128274;</div>
+        <h3>Private</h3>
+        <p>Everything stays on your machine in a local SQLite database. No accounts, no cloud.</p>
+      </div>
+    </div>
+
+    <div class="screenshot-section">
+      <h2>Simple by design</h2>
+      <div class="mockup">
+        <div class="mockup-label">Working</div>
+        <div class="mockup-label" style="font-size:0.8rem;">Next break in</div>
+        <div class="mockup-timer">14:32</div>
+        <div class="mockup-bar">
+          <div class="mockup-bar-fill"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="how-it-works">
+      <h2>How it works</h2>
+      <div class="steps">
+        <div class="step">
+          <div class="step-num">1</div>
+          <div class="step-text"><strong>Work timer counts down</strong> in the menu bar. You focus on your work.</div>
+        </div>
+        <div class="step">
+          <div class="step-num">2</div>
+          <div class="step-text"><strong>Popup appears</strong> when the timer fires. Log what you were working on.</div>
+        </div>
+        <div class="step">
+          <div class="step-num">3</div>
+          <div class="step-text"><strong>Take a break</strong> or snooze. Pick a break activity and a break timer starts.</div>
+        </div>
+        <div class="step">
+          <div class="step-num">4</div>
+          <div class="step-text"><strong>Break ends</strong>, the work timer restarts. Check your stats anytime.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="tech">
+      Built with <span class="badge">Electrobun</span> <span class="badge">React</span> <span class="badge">Bun</span> <span class="badge">SQLite</span>
+      <br><br>
+      <a href="https://github.com/jensb1/abortme">View on GitHub</a>
+    </div>
+  </div>
+</body>
+</html>

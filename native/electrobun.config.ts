@@ -21,6 +21,8 @@ export default {
       "dist/renderer": "views/renderer",
       "assets/tray-iconTemplate.png": "assets/tray-iconTemplate.png",
       "assets/tray-iconTemplate@2x.png": "assets/tray-iconTemplate@2x.png",
+      "assets/tray-icon-breakTemplate.png": "assets/tray-icon-breakTemplate.png",
+      "assets/tray-icon-breakTemplate@2x.png": "assets/tray-icon-breakTemplate@2x.png",
     },
   },
 } satisfies ElectrobunConfig;
