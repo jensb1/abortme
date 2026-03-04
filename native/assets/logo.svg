@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#6366f1"/>
+      <stop offset="100%" stop-color="#8b5cf6"/>
+    </linearGradient>
+  </defs>
+  <!-- Rounded square background -->
+  <rect width="512" height="512" rx="108" fill="url(#bg)"/>
+  <!-- Clock circle -->
+  <circle cx="256" cy="272" r="160" fill="none" stroke="white" stroke-width="24" opacity="0.9"/>
+  <!-- Clock hour hand -->
+  <line x1="256" y1="272" x2="256" y2="176" stroke="white" stroke-width="20" stroke-linecap="round" opacity="0.9"/>
+  <!-- Clock minute hand -->
+  <line x1="256" y1="272" x2="320" y2="232" stroke="white" stroke-width="16" stroke-linecap="round" opacity="0.9"/>
+  <!-- Center dot -->
+  <circle cx="256" cy="272" r="12" fill="white" opacity="0.9"/>
+  <!-- Pause bars at top -->
+  <rect x="218" y="68" width="24" height="64" rx="6" fill="white"/>
+  <rect x="270" y="68" width="24" height="64" rx="6" fill="white"/>
+</svg>

@@ -1,4 +1,5 @@
-import { BrowserWindow, BrowserView } from "electrobun/bun";
+import { BrowserWindow, BrowserView, Tray } from "electrobun/bun";
+import Electrobun from "electrobun/bun";
 import type { AppRPC } from "../shared/rpc";
 import * as db from "./db";
 
@@ -9,6 +10,10 @@ const viewsExist = existsSync(resolve("../Resources/app/views/renderer/index.htm
 const appUrl = viewsExist
   ? "views://renderer/index.html"
   : "http://localhost:6001";
+
+const trayIconPath = viewsExist
+  ? resolve("../Resources/app/assets/tray-iconTemplate.png")
+  : resolve("assets/tray-iconTemplate.png");
 
 let popupIntervalMinutes = Number(db.getSetting("popupInterval", "20"));
 let breakDurationMinutes = Number(db.getSetting("breakDuration", "5"));
@@ -35,15 +40,153 @@ async function getIdleSeconds(): Promise<number> {
   }
 }
 
-function startPopupTimer(win: BrowserWindow) {
+// --- Tray timer display ---
+function formatTimer(ms: number): string {
+  const totalSec = Math.max(0, Math.ceil(ms / 1000));
+  const m = Math.floor(totalSec / 60);
+  const s = totalSec % 60;
+  return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+}
+
+function getRemainingMs(): number {
+  if (isIdle || !popupTimer) return popupRemainingMs;
+  const elapsed = Date.now() - popupStartedAt;
+  return Math.max(0, popupRemainingMs - elapsed);
+}
+
+let trayUpdateInterval: ReturnType<typeof setInterval> | null = null;
+
+function updateTrayTitle() {
+  const remaining = getRemainingMs();
+  tray.setTitle(formatTimer(remaining));
+}
+
+function startTrayUpdates() {
+  if (trayUpdateInterval) clearInterval(trayUpdateInterval);
+  updateTrayTitle();
+  trayUpdateInterval = setInterval(updateTrayTitle, 1000);
+}
+
+// --- Window management ---
+let win: BrowserWindow | null = null;
+
+function createWindow() {
+  if (win) {
+    win.focus();
+    return;
+  }
+
+  const newRpc = BrowserView.defineRPC<AppRPC>({
+    handlers: {
+      requests: ({
+        getPopupInterval: () => popupIntervalMinutes,
+
+        setPopupInterval: ({ minutes }: { minutes: number }) => {
+          popupIntervalMinutes = minutes;
+          db.setSetting("popupInterval", String(minutes));
+          return { success: true };
+        },
+
+        getBreakDuration: () => breakDurationMinutes,
+
+        setBreakDuration: ({ minutes }: { minutes: number }) => {
+          breakDurationMinutes = minutes;
+          db.setSetting("breakDuration", String(minutes));
+          return { success: true };
+        },
+
+        getWorkActivities: () => db.getWorkActivities(),
+
+        addWorkActivity: ({ name }: { name: string }) => db.addWorkActivity(name),
+
+        removeWorkActivity: ({ id }: { id: string }) => {
+          db.removeWorkActivity(id);
+          return { success: true };
+        },
+
+        getBreakActivities: () => db.getBreakActivities(),
+
+        addBreakActivity: ({ name }: { name: string }) => db.addBreakActivity(name),
+
+        removeBreakActivity: ({ id }: { id: string }) => {
+          db.removeBreakActivity(id);
+          return { success: true };
+        },
+
+        logWork: ({ activityIds }: { activityIds: string[] }) => {
+          db.logWork(activityIds);
+          return { success: true };
+        },
+
+        logBreak: ({ activityIds, durationMinutes }: { activityIds: string[]; durationMinutes: number }) => {
+          db.logBreak(activityIds, durationMinutes);
+          return { success: true };
+        },
+
+        getWorkLogs: ({ from, to }: { from: string; to: string }) => {
+          const rawWorkLogs = db.getWorkLogs(from, to);
+          return rawWorkLogs.map((log) => ({
+            id: log.id,
+            timestamp: log.timestamp,
+            activities: JSON.parse(log.activities),
+          }));
+        },
+
+        getBreakLogs: ({ from, to }: { from: string; to: string }) => {
+          const rawBreakLogs = db.getBreakLogs(from, to);
+          return rawBreakLogs.map((log) => ({
+            id: log.id,
+            timestamp: log.timestamp,
+            activities: JSON.parse(log.activities),
+            durationMinutes: log.duration_minutes,
+          }));
+        },
+
+        dismissPopup: () => {
+          if (win) win.setAlwaysOnTop(false);
+          return { success: true };
+        },
+
+        restartTimer: () => {
+          startPopupTimer();
+          return { success: true };
+        },
+      }) as any,
+      messages: {},
+    },
+  });
+
+  currentRpc = newRpc;
+
+  win = new BrowserWindow({
+    title: "AbortMe",
+    url: appUrl,
+    frame: {
+      x: 100,
+      y: 100,
+      width: 1024,
+      height: 768,
+    },
+    rpc: newRpc,
+  });
+}
+
+let currentRpc: ReturnType<typeof BrowserView.defineRPC<AppRPC>> | null = null;
+
+// --- Popup timer ---
+function startPopupTimer() {
   if (popupTimer) clearTimeout(popupTimer);
   popupRemainingMs = popupIntervalMinutes * 60_000;
   popupStartedAt = Date.now();
 
   popupTimer = setTimeout(() => {
-    win.setAlwaysOnTop(true);
-    win.focus();
-    (rpc as any).send.popupTriggered({});
+    // Ensure window exists and show it
+    if (!win) createWindow();
+    if (win) {
+      win.setAlwaysOnTop(true);
+      win.focus();
+    }
+    if (currentRpc) (currentRpc as any).send.popupTriggered({});
     // Reset for next cycle
     popupRemainingMs = popupIntervalMinutes * 60_000;
     popupStartedAt = Date.now();
@@ -60,19 +203,22 @@ function pausePopupTimer() {
   }
 }
 
-function resumePopupTimer(win: BrowserWindow) {
+function resumePopupTimer() {
   if (popupTimer) clearTimeout(popupTimer);
   popupStartedAt = Date.now();
 
   popupTimer = setTimeout(() => {
-    win.setAlwaysOnTop(true);
-    win.focus();
-    (rpc as any).send.popupTriggered({});
-    startPopupTimer(win);
+    if (!win) createWindow();
+    if (win) {
+      win.setAlwaysOnTop(true);
+      win.focus();
+    }
+    if (currentRpc) (currentRpc as any).send.popupTriggered({});
+    startPopupTimer();
   }, popupRemainingMs);
 }
 
-function startIdlePolling(win: BrowserWindow) {
+function startIdlePolling() {
   if (idlePoller) clearInterval(idlePoller);
   idlePoller = setInterval(async () => {
     const idle = await getIdleSeconds();
@@ -81,102 +227,63 @@ function startIdlePolling(win: BrowserWindow) {
     if (nowIdle && !isIdle) {
       isIdle = true;
       pausePopupTimer();
-      (rpc as any).send.idleStateChanged({ idle: true });
+      if (currentRpc) (currentRpc as any).send.idleStateChanged({ idle: true });
     } else if (!nowIdle && isIdle) {
       isIdle = false;
-      resumePopupTimer(win);
-      (rpc as any).send.idleStateChanged({ idle: false });
+      resumePopupTimer();
+      if (currentRpc) (currentRpc as any).send.idleStateChanged({ idle: false });
     }
   }, IDLE_POLL_MS);
 }
 
-const rpc = BrowserView.defineRPC<AppRPC>({
-  handlers: {
-    requests: ({
-      getPopupInterval: () => popupIntervalMinutes,
-
-      setPopupInterval: ({ minutes }) => {
-        popupIntervalMinutes = minutes;
-        db.setSetting("popupInterval", String(minutes));
-        startPopupTimer(win);
-        return { success: true };
-      },
-
-      getBreakDuration: () => breakDurationMinutes,
-
-      setBreakDuration: ({ minutes }) => {
-        breakDurationMinutes = minutes;
-        db.setSetting("breakDuration", String(minutes));
-        return { success: true };
-      },
-
-      getWorkActivities: () => db.getWorkActivities(),
-
-      addWorkActivity: ({ name }) => db.addWorkActivity(name),
-
-      removeWorkActivity: ({ id }) => {
-        db.removeWorkActivity(id);
-        return { success: true };
-      },
-
-      getBreakActivities: () => db.getBreakActivities(),
-
-      addBreakActivity: ({ name }) => db.addBreakActivity(name),
-
-      removeBreakActivity: ({ id }) => {
-        db.removeBreakActivity(id);
-        return { success: true };
-      },
-
-      logWork: ({ activityIds }) => {
-        db.logWork(activityIds);
-        return { success: true };
-      },
-
-      logBreak: ({ activityIds, durationMinutes }) => {
-        db.logBreak(activityIds, durationMinutes);
-        return { success: true };
-      },
-
-      getWorkLogs: ({ from, to }) => {
-        const rawWorkLogs = db.getWorkLogs(from, to);
-        return rawWorkLogs.map((log) => ({
-          id: log.id,
-          timestamp: log.timestamp,
-          activities: JSON.parse(log.activities),
-        }));
-      },
-
-      getBreakLogs: ({ from, to }) => {
-        const rawBreakLogs = db.getBreakLogs(from, to);
-        return rawBreakLogs.map((log) => ({
-          id: log.id,
-          timestamp: log.timestamp,
-          activities: JSON.parse(log.activities),
-          durationMinutes: log.duration_minutes,
-        }));
-      },
-
-      dismissPopup: () => {
-        win.setAlwaysOnTop(false);
-        return { success: true };
-      },
-    }) as any,
-    messages: {},
-  },
+// Track window destruction
+Electrobun.events.on("close", (event: { data: { id: number } }) => {
+  if (win && (win as any).id === event.data.id) {
+    win = null;
+    currentRpc = null;
+  }
 });
 
-const win = new BrowserWindow({
-  title: "AbortMe",
-  url: appUrl,
-  frame: {
-    x: 100,
-    y: 100,
-    width: 1024,
-    height: 768,
-  },
-  rpc,
+// --- Tray setup ---
+const tray = new Tray({
+  title: "00:00",
+  image: trayIconPath,
+  template: true,
+  width: 18,
+  height: 18,
 });
 
-startPopupTimer(win);
-startIdlePolling(win);
+tray.setMenu([
+  {
+    type: "normal",
+    label: "Show AbortMe",
+    action: "show",
+  },
+  {
+    type: "separator",
+  },
+  {
+    type: "normal",
+    label: "Quit",
+    action: "quit",
+  },
+]);
+
+tray.on("tray-clicked", (event: any) => {
+  const action = event?.data?.action;
+  if (action === "show") {
+    if (win) {
+      win.focus();
+    } else {
+      createWindow();
+    }
+  } else if (action === "quit") {
+    process.exit(0);
+  }
+});
+
+// --- Start ---
+createWindow();
+startPopupTimer();
+startIdlePolling();
+startTrayUpdates();

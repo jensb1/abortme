@@ -132,6 +132,15 @@ export function App() {
     setStep("break");
   }
 
+  function handleWorkExtend() {
+    rpc.request
+      .logWork({ activityIds: [...selectedWork] })
+      .catch(() => {});
+    rpc.request.dismissPopup({}).catch(() => {});
+    setSelectedWork(new Set());
+    setStep("working");
+  }
+
   function handleBreakStart() {
     rpc.request
       .logBreak({
@@ -169,10 +178,11 @@ export function App() {
     return <StatsView onClose={() => setShowStats(false)} />;
   }
 
-  // Settings panel
-  if (showSettings) {
-    return (
-      <div className="fixed inset-0 flex items-center justify-center bg-background/95 backdrop-blur-sm">
+  return (
+    <>
+    {/* Settings overlay — rendered on top, does not unmount main content */}
+    {showSettings && (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/95 backdrop-blur-sm">
         <div className="w-full max-w-md rounded-xl border border-border bg-card p-6 shadow-2xl">
           <div className="mb-6 flex items-center justify-between">
             <h2 className="text-xl font-bold">Settings</h2>
@@ -224,10 +234,8 @@ export function App() {
           </div>
         </div>
       </div>
-    );
-  }
+    )}
 
-  return (
     <div className="fixed inset-0 flex items-center justify-center bg-background/95 backdrop-blur-sm">
       {/* Idle indicator */}
       {idle && (
@@ -266,6 +274,7 @@ export function App() {
             onAdd={addWorkActivity}
             onRemove={removeWorkActivity}
             onNext={handleWorkNext}
+            onExtend={handleWorkExtend}
           />
         )}
 
@@ -291,5 +300,6 @@ export function App() {
         )}
       </div>
     </div>
+    </>
   );
 }

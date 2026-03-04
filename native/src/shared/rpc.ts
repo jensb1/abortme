@@ -64,6 +64,10 @@ export type AppRPC = ElectrobunRPCSchema & {
         params: {};
         response: { success: boolean };
       };
+      restartTimer: {
+        params: {};
+        response: { success: boolean };
+      };
     };
     messages: {
       popupTriggered: {};

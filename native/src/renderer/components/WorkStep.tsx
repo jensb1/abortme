@@ -9,6 +9,7 @@ interface WorkStepProps {
   onAdd: (name: string) => void;
   onRemove: (id: string) => void;
   onNext: () => void;
+  onExtend: () => void;
 }
 
 export function WorkStep({
@@ -18,6 +19,7 @@ export function WorkStep({
   onAdd,
   onRemove,
   onNext,
+  onExtend,
 }: WorkStepProps) {
   return (
     <div className="flex flex-col gap-6">
@@ -39,14 +41,25 @@ export function WorkStep({
         showManage
       />
 
-      <Button
-        size="lg"
-        onClick={onNext}
-        disabled={selected.size === 0}
-        className="w-full"
-      >
-        Log &amp; take a break
-      </Button>
+      <div className="flex flex-col gap-2">
+        <Button
+          size="lg"
+          onClick={onNext}
+          disabled={selected.size === 0}
+          className="w-full"
+        >
+          Log &amp; take a break
+        </Button>
+        <Button
+          variant="outline"
+          size="lg"
+          onClick={onExtend}
+          disabled={selected.size === 0}
+          className="w-full"
+        >
+          Log &amp; keep working
+        </Button>
+      </div>
     </div>
   );
 }

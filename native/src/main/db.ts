@@ -1,8 +1,14 @@
 import { Database } from "bun:sqlite";
 import { randomUUID } from "crypto";
+import { mkdirSync } from "fs";
+import { join } from "path";
+import { homedir } from "os";
 import type { Activity } from "../shared/types";
 
-const db = new Database("abortme.db");
+const appDataDir = join(homedir(), "Library", "Application Support", "AbortMe");
+mkdirSync(appDataDir, { recursive: true });
+
+const db = new Database(join(appDataDir, "abortme.db"));
 db.run("PRAGMA journal_mode = WAL");
 
 db.run(`
